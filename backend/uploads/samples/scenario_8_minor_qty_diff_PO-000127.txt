@@ -1,0 +1,27 @@
+INVOICE
+============================================================
+Invoice Number: INV-QTYLO-008
+Invoice Date: 2026-02-11
+Due Date: 2026-03-13
+PO Reference: PO-000127
+
+VENDOR:
+  Name: Supplier_10
+  Vendor ID: 10
+  Payment Terms: NET15
+
+BILL TO:
+  ProcureAI Corp
+  123 Business Park
+  London, UK
+
+LINE ITEMS:
+  1. ITEM-010  Material Description 10  Qty: 186  Unit Price: 303.99 USD  Total: 56542.14 USD
+
+============================================================
+  Subtotal: 56542.14 USD
+  Tax (5%): 2827.11 USD
+  TOTAL DUE: 59369.25 USD
+============================================================
+
+[Scenario: PARTIAL MATCH - Qty 1.5% under PO (within 2% tolerance, minor flag)]

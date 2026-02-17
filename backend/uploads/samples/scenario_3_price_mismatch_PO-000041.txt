@@ -1,0 +1,27 @@
+INVOICE
+============================================================
+Invoice Number: INV-OVER-003
+Invoice Date: 2026-02-10
+Due Date: 2026-03-12
+PO Reference: PO-000041
+
+VENDOR:
+  Name: Supplier_5
+  Vendor ID: 5
+  Payment Terms: NET15
+
+BILL TO:
+  ProcureAI Corp
+  123 Business Park
+  London, UK
+
+LINE ITEMS:
+  1. ITEM-003  Material Description 3  Qty: 385.0  Unit Price: 198.99 USD  Total: 76611.15 USD
+
+============================================================
+  Subtotal: 76611.15 USD
+  Tax (10%): 7661.11 USD
+  TOTAL DUE: 84272.26 USD
+============================================================
+
+[Scenario: NO MATCH - Prices 25% higher than PO (possible fraud or wrong rate)]

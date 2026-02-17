@@ -1,0 +1,28 @@
+INVOICE
+============================================================
+Invoice Number: INV-QTYHI-004
+Invoice Date: 2026-02-15
+Due Date: 2026-03-17
+PO Reference: PO-000056
+
+VENDOR:
+  Name: Supplier_9
+  Vendor ID: 9
+  Payment Terms: IMMEDIATE
+
+BILL TO:
+  ProcureAI Corp
+  123 Business Park
+  London, UK
+
+LINE ITEMS:
+  1. ITEM-003  Material Description 3  Qty: 26  Unit Price: 324.31 EUR  Total: 8432.06 EUR
+  2. ITEM-005  Material Description 5  Qty: 504  Unit Price: 22.10 EUR  Total: 11138.40 EUR
+
+============================================================
+  Subtotal: 19570.46 EUR
+  Tax (0%): 0.00 EUR
+  TOTAL DUE: 19570.46 EUR
+============================================================
+
+[Scenario: NO MATCH - Quantity doubled (billing for 2x what was ordered/received)]

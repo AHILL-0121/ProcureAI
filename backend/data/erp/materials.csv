@@ -1,0 +1,21 @@
+ITEM_ID,ITEM_NUMBER,DESCRIPTION,UOM
+1001,ITEM-001,Material Description 1,KG
+1002,ITEM-002,Material Description 2,KG
+1003,ITEM-003,Material Description 3,EA
+1004,ITEM-004,Material Description 4,EA
+1005,ITEM-005,Material Description 5,LTR
+1006,ITEM-006,Material Description 6,EA
+1007,ITEM-007,Material Description 7,LTR
+1008,ITEM-008,Material Description 8,KG
+1009,ITEM-009,Material Description 9,INVALID
+1010,ITEM-010,Material Description 10,EA
+1011,ITEM-011,Material Description 11,KG
+1012,ITEM-012,Material Description 12,LTR
+1013,ITEM-013,Material Description 13,LTR
+1014,ITEM-014,Material Description 14,INVALID
+1015,ITEM-015,Material Description 15,LTR
+1016,ITEM-016,Material Description 16,KG
+1017,ITEM-017,Material Description 17,EA
+1018,ITEM-018,Material Description 18,KG
+1019,ITEM-019,Material Description 19,KG
+1020,ITEM-020,Material Description 20,INVALID

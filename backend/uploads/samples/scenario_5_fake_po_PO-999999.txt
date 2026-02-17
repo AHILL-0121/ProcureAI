@@ -1,0 +1,27 @@
+INVOICE
+============================================================
+Invoice Number: INV-FAKE-005
+Invoice Date: 2026-02-16
+Due Date: 2026-03-18
+PO Reference: PO-999999
+
+VENDOR:
+  Name: Unknown Vendor Corp
+  Vendor ID: 999
+  Payment Terms: NET30
+
+BILL TO:
+  ProcureAI Corp
+  123 Business Park
+  London, UK
+
+LINE ITEMS:
+  1. ITEM-007  Material Description 7  Qty: 100  Unit Price: 250.00 USD  Total: 25000.00 USD
+
+============================================================
+  Subtotal: 25000.00 USD
+  Tax (18%): 4500.00 USD
+  TOTAL DUE: 29500.00 USD
+============================================================
+
+[Scenario: NO MATCH - PO-999999 does not exist in ERP (possible fraud)]
