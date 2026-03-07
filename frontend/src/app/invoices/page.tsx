@@ -5,6 +5,8 @@ import { apiFetch, formatCurrency, formatDate, getStatusColor, getMatchColor, cn
 import { useWebSocket } from '@/components/WebSocketProvider';
 import { InvoicesPageSkeleton } from '@/components/Skeletons';
 import type { Invoice } from '@/lib/types';
+import { tokens } from '@/lib/design-tokens';
+import { Badge } from '@/components/UIComponents';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -47,10 +49,15 @@ export default function InvoicesPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between animate-fade-in-down">
         <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-surface-900 to-surface-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold" style={{
+            background: `linear-gradient(to right, ${tokens.charcoal}, ${tokens.slate})`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
             Invoices
           </h1>
-          <p className="text-sm text-surface-400">{total} invoice{total !== 1 ? 's' : ''} processed</p>
+          <p className="text-sm" style={{ color: tokens.mist }}>{total} invoice{total !== 1 ? 's' : ''} processed</p>
         </div>
       </div>
 
@@ -61,12 +68,12 @@ export default function InvoicesPage() {
           placeholder="Search by invoice #, vendor, PO..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="glass-input px-4 py-2.5 rounded-xl text-sm flex-1 min-w-[200px] outline-none"
+          className="warm-input px-4 py-2.5 flex-1 min-w-[200px]"
         />
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="glass-input px-4 py-2.5 rounded-xl text-sm outline-none cursor-pointer"
+          className="warm-input px-4 py-2.5 cursor-pointer"
         >
           <option value="">All Statuses</option>
           {statusOptions.filter(Boolean).map((s) => (
@@ -77,24 +84,24 @@ export default function InvoicesPage() {
 
       {/* Table */}
       {invoices.length === 0 ? (
-        <div className="glass-card p-12 text-center animate-fade-in-up">
-          <div className="text-4xl mb-3 animate-bounce-gentle">📄</div>
-          <p className="text-surface-400 text-sm">No invoices found. Upload one to get started!</p>
+        <div className="warm-card p-12 text-center animate-fade-in-up">
+          <div className="text-4xl mb-3">📄</div>
+          <p className="text-sm" style={{ color: tokens.mist }}>No invoices found. Upload one to get started!</p>
         </div>
       ) : (
-        <div className="glass-table animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+        <div className="warm-card overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-primary-500/10 bg-primary-500/5">
-                  <th className="text-left px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Invoice #</th>
-                  <th className="text-left px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Vendor</th>
-                  <th className="text-left px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">PO Ref</th>
-                  <th className="text-right px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Amount</th>
-                  <th className="text-center px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Status</th>
-                  <th className="text-center px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Match</th>
-                  <th className="text-right px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Time</th>
-                  <th className="text-right px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Date</th>
+                <tr style={{ borderBottom: `1px solid ${tokens.sand}80`, background: `${tokens.parchment}` }}>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Invoice #</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Vendor</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>PO Ref</th>
+                  <th className="text-right px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Amount</th>
+                  <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Status</th>
+                  <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Match</th>
+                  <th className="text-right px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Time</th>
+                  <th className="text-right px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Date</th>
                 </tr>
               </thead>
               <tbody className="stagger-children">
@@ -102,26 +109,25 @@ export default function InvoicesPage() {
                   <tr
                     key={inv.id}
                     onClick={() => setSelected(inv)}
-                    className="border-b border-white/10 hover:bg-primary-500/5 cursor-pointer transition-all duration-200 group"
+                    className="cursor-pointer transition-all duration-200 group"
+                    style={{ borderBottom: `1px solid ${tokens.sand}40` }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = `${tokens.amber}08`}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <td className="px-4 py-3.5 font-medium text-surface-800 group-hover:text-primary-700 transition-colors">{inv.invoice_number || '-'}</td>
-                    <td className="px-4 py-3.5 text-surface-600">{inv.vendor_name || '-'}</td>
-                    <td className="px-4 py-3.5 text-surface-500 font-mono text-xs">{inv.po_reference || '-'}</td>
-                    <td className="px-4 py-3.5 text-right font-medium text-surface-800">{formatCurrency(inv.total_amount)}</td>
+                    <td className="px-4 py-3.5 font-medium transition-colors" style={{ color: tokens.charcoal }}>{inv.invoice_number || '-'}</td>
+                    <td className="px-4 py-3.5" style={{ color: tokens.slate }}>{inv.vendor_name || '-'}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs" style={{ color: tokens.mist }}>{inv.po_reference || '-'}</td>
+                    <td className="px-4 py-3.5 text-right font-medium" style={{ color: tokens.charcoal }}>{formatCurrency(inv.total_amount)}</td>
                     <td className="px-4 py-3.5 text-center">
-                      <span className={cn('px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm', getStatusColor(inv.status))}>
-                        {inv.status}
-                      </span>
+                      <Badge type={inv.status} />
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <span className={cn('px-2.5 py-1 rounded-full text-xs font-medium border backdrop-blur-sm', getMatchColor(inv.match_result))}>
-                        {inv.match_result}
-                      </span>
+                      <Badge type={inv.match_result || 'PROCESSING'} />
                     </td>
-                    <td className="px-4 py-3.5 text-right text-surface-400 text-xs">
+                    <td className="px-4 py-3.5 text-right text-xs" style={{ color: tokens.mist }}>
                       {inv.processing_time ? `${inv.processing_time}s` : '-'}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-surface-400 text-xs">{formatDate(inv.created_at)}</td>
+                    <td className="px-4 py-3.5 text-right text-xs" style={{ color: tokens.mist }}>{formatDate(inv.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -140,16 +146,27 @@ export default function InvoicesPage() {
 
 function InvoiceDetailModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm animate-fade-in" 
+      style={{ background: 'rgba(0,0,0,0.3)' }} onClick={onClose}>
       <div
-        className="glass-modal rounded-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto animate-slide-up"
+        className="warm-card rounded-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+        style={{ animation: 'slideUp 0.35s cubic-bezier(0.16,1,0.3,1)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/20">
-          <h2 className="text-lg font-bold bg-gradient-to-r from-surface-900 to-surface-600 bg-clip-text text-transparent">
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: `${tokens.sand}80` }}>
+          <h2 className="text-lg font-bold" style={{
+            background: `linear-gradient(to right, ${tokens.charcoal}, ${tokens.slate})`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
             Invoice Detail
           </h2>
-          <button onClick={onClose} className="text-surface-400 hover:text-surface-600 text-xl transition-colors hover:rotate-90 duration-300">
+          <button onClick={onClose} className="text-xl transition-all duration-300" 
+            style={{ color: tokens.mist }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = tokens.ember; e.currentTarget.style.transform = 'rotate(90deg)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = tokens.mist; e.currentTarget.style.transform = 'rotate(0deg)'; }}
+          >
             &times;
           </button>
         </div>
@@ -158,40 +175,39 @@ function InvoiceDetailModal({ invoice, onClose }: { invoice: Invoice; onClose: (
           {/* Header info */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-surface-400">Invoice #:</span>
-              <span className="ml-2 font-medium text-surface-800">{invoice.invoice_number || '-'}</span>
+              <span style={{ color: tokens.mist }}>Invoice #:</span>
+              <span className="ml-2 font-medium" style={{ color: tokens.charcoal }}>{invoice.invoice_number || '-'}</span>
             </div>
             <div>
-              <span className="text-surface-400">Vendor:</span>
-              <span className="ml-2 font-medium text-surface-800">{invoice.vendor_name || '-'}</span>
+              <span style={{ color: tokens.mist }}>Vendor:</span>
+              <span className="ml-2 font-medium" style={{ color: tokens.charcoal }}>{invoice.vendor_name || '-'}</span>
             </div>
             <div>
-              <span className="text-surface-400">PO Reference:</span>
-              <span className="ml-2 font-mono text-xs text-surface-600">{invoice.po_reference || '-'}</span>
+              <span style={{ color: tokens.mist }}>PO Reference:</span>
+              <span className="ml-2 font-mono text-xs" style={{ color: tokens.slate }}>{invoice.po_reference || '-'}</span>
             </div>
             <div>
-              <span className="text-surface-400">Total:</span>
-              <span className="ml-2 font-bold text-surface-800">{formatCurrency(invoice.total_amount)}</span>
+              <span style={{ color: tokens.mist }}>Total:</span>
+              <span className="ml-2 font-bold" style={{ color: tokens.charcoal }}>{formatCurrency(invoice.total_amount)}</span>
             </div>
             <div>
-              <span className="text-surface-400">Date:</span>
-              <span className="ml-2 text-surface-700">{invoice.invoice_date || '-'}</span>
+              <span style={{ color: tokens.mist }}>Date:</span>
+              <span className="ml-2" style={{ color: tokens.slate }}>{invoice.invoice_date || '-'}</span>
             </div>
             <div>
-              <span className="text-surface-400">Confidence:</span>
-              <span className="ml-2 text-surface-700">{(invoice.confidence_score * 100).toFixed(0)}%</span>
+              <span style={{ color: tokens.mist }}>Confidence:</span>
+              <span className="ml-2" style={{ color: tokens.slate }}>{(invoice.confidence_score * 100).toFixed(0)}%</span>
             </div>
           </div>
 
           {/* Status badges */}
           <div className="flex gap-2 flex-wrap">
-            <span className={cn('px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm', getStatusColor(invoice.status))}>
-              {invoice.status}
-            </span>
-            <span className={cn('px-3 py-1.5 rounded-full text-xs font-medium border backdrop-blur-sm', getMatchColor(invoice.match_result))}>
-              {invoice.match_result}
-            </span>
-            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-surface-100/80 text-surface-600 backdrop-blur-sm">
+            <Badge type={invoice.status} />
+            <Badge type={invoice.match_result || 'PROCESSING'} />
+            <span className="px-3 py-1.5 rounded-full text-xs font-medium" style={{
+              background: `${tokens.sand}80`,
+              color: tokens.slate
+            }}>
               {invoice.invoice_type}
             </span>
           </div>
@@ -199,26 +215,26 @@ function InvoiceDetailModal({ invoice, onClose }: { invoice: Invoice; onClose: (
           {/* Line Items */}
           {invoice.line_items && invoice.line_items.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-surface-700 mb-2">Line Items</h3>
-              <div className="glass rounded-xl overflow-hidden">
+              <h3 className="text-sm font-semibold mb-2" style={{ color: tokens.charcoal }}>Line Items</h3>
+              <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${tokens.sand}` }}>
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-primary-500/10 bg-primary-500/5">
-                      <th className="text-left px-3 py-2">Code</th>
-                      <th className="text-left px-3 py-2">Description</th>
-                      <th className="text-right px-3 py-2">Qty</th>
-                      <th className="text-right px-3 py-2">Price</th>
-                      <th className="text-right px-3 py-2">Total</th>
+                    <tr style={{ borderBottom: `1px solid ${tokens.sand}80`, background: tokens.parchment }}>
+                      <th className="text-left px-3 py-2" style={{ color: tokens.slate }}>Code</th>
+                      <th className="text-left px-3 py-2" style={{ color: tokens.slate }}>Description</th>
+                      <th className="text-right px-3 py-2" style={{ color: tokens.slate }}>Qty</th>
+                      <th className="text-right px-3 py-2" style={{ color: tokens.slate }}>Price</th>
+                      <th className="text-right px-3 py-2" style={{ color: tokens.slate }}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {invoice.line_items.map((item, i) => (
-                      <tr key={i} className="border-b border-white/10">
-                        <td className="px-3 py-2 font-mono text-surface-600">{item.item_code || '-'}</td>
-                        <td className="px-3 py-2 text-surface-700">{item.description}</td>
-                        <td className="px-3 py-2 text-right text-surface-600">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-surface-600">{formatCurrency(item.unit_price)}</td>
-                        <td className="px-3 py-2 text-right font-medium text-surface-800">{formatCurrency(item.total_price)}</td>
+                      <tr key={i} style={{ borderBottom: `1px solid ${tokens.sand}40` }}>
+                        <td className="px-3 py-2 font-mono" style={{ color: tokens.slate }}>{item.item_code || '-'}</td>
+                        <td className="px-3 py-2" style={{ color: tokens.charcoal }}>{item.description}</td>
+                        <td className="px-3 py-2 text-right" style={{ color: tokens.slate }}>{item.quantity}</td>
+                        <td className="px-3 py-2 text-right" style={{ color: tokens.slate }}>{formatCurrency(item.unit_price)}</td>
+                        <td className="px-3 py-2 text-right font-medium" style={{ color: tokens.charcoal }}>{formatCurrency(item.total_price)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -230,15 +246,14 @@ function InvoiceDetailModal({ invoice, onClose }: { invoice: Invoice; onClose: (
           {/* Discrepancies */}
           {invoice.discrepancies && invoice.discrepancies.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-red-700 mb-2">Discrepancies ({invoice.discrepancies.length})</h3>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: tokens.crimson }}>Discrepancies ({invoice.discrepancies.length})</h3>
               <div className="space-y-2 stagger-children">
                 {invoice.discrepancies.map((d, i) => (
-                  <div key={i} className={cn(
-                    'p-3 rounded-xl text-xs border backdrop-blur-sm',
-                    d.severity === 'HIGH' ? 'bg-red-50/80 border-red-200/60 text-red-800' :
-                    d.severity === 'MEDIUM' ? 'bg-amber-50/80 border-amber-200/60 text-amber-800' :
-                    'bg-sky-50/80 border-sky-200/60 text-sky-800'
-                  )}>
+                  <div key={i} className="p-3 rounded-xl text-xs border" style={{
+                    background: d.severity === 'HIGH' ? '#FEE2E2' : d.severity === 'MEDIUM' ? '#FEF9C3' : '#F0F9FF',
+                    borderColor: d.severity === 'HIGH' ? tokens.crimson : d.severity === 'MEDIUM' ? tokens.gold : '#0284C7',
+                    color: d.severity === 'HIGH' ? tokens.crimson : d.severity === 'MEDIUM' ? tokens.ember : '#0369A1'
+                  }}>
                     <span className="font-semibold">[{d.severity}] {d.type}:</span> {d.message}
                   </div>
                 ))}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { tokens } from '@/lib/design-tokens';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: BarChartIcon },
@@ -15,15 +16,26 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col glass-sidebar animate-slide-in-left">
+    <aside className="hidden md:flex md:w-64 md:flex-col warm-sidebar animate-slide-in-left">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-white/20">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 text-white font-bold text-lg shadow-lg shadow-primary-500/20 animate-glow">
-          P
+      <div className="flex items-center gap-3 px-6 py-5 border-b" style={{ borderColor: `${tokens.sand}80` }}>
+        <div 
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-white font-bold text-lg animate-glow"
+          style={{
+            background: `linear-gradient(135deg, ${tokens.amber}, ${tokens.ember})`,
+            boxShadow: `0 4px 12px ${tokens.amber}50`
+          }}
+        >
+          📄
         </div>
         <div>
-          <h1 className="text-lg font-bold bg-gradient-to-r from-primary-700 to-accent-600 bg-clip-text text-transparent">ProcureAI</h1>
-          <p className="text-xs text-surface-400">Powered by Llama 3.1</p>
+          <h1 className="text-lg font-bold" style={{ 
+            background: `linear-gradient(to right, ${tokens.amber}, ${tokens.ember})`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>ProcureAI</h1>
+          <p className="text-xs" style={{ color: tokens.mist }}>Powered by Llama 3.1</p>
         </div>
       </div>
 
@@ -31,32 +43,44 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
+          const iconColor = isActive ? tokens.amber : tokens.mist;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300',
-                isActive
-                  ? 'bg-gradient-to-r from-primary-500/15 to-accent-500/10 text-primary-700 shadow-sm shadow-primary-500/10 border border-primary-500/20'
-                  : 'text-surface-500 hover:bg-white/30 hover:text-surface-800 hover:translate-x-1'
-              )}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300"
+              style={{
+                background: isActive ? `${tokens.amber}15` : 'transparent',
+                color: isActive ? tokens.ember : tokens.slate,
+                boxShadow: isActive ? `0 2px 8px ${tokens.amber}20` : 'none',
+                border: isActive ? `1px solid ${tokens.amber}30` : '1px solid transparent'
+              }}
             >
-              <item.icon className={cn('h-5 w-5 transition-colors', isActive ? 'text-primary-500' : 'text-surface-400')} />
+              <span style={{ color: iconColor }}>
+                <item.icon className="h-5 w-5 transition-colors" />
+              </span>
               {item.label}
-              {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary-500 animate-pulse-green" />}
+              {isActive && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full" style={{
+                  background: tokens.amber,
+                  animation: 'pulse 1.5s infinite'
+                }} />
+              )}
             </Link>
           );
         })}
       </nav>
 
       {/* System Status */}
-      <div className="px-4 py-4 border-t border-white/20">
-        <div className="flex items-center gap-2 text-xs text-surface-500">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-green" />
+      <div className="px-4 py-4 border-t" style={{ borderColor: `${tokens.sand}80` }}>
+        <div className="flex items-center gap-2 text-xs" style={{ color: tokens.slate }}>
+          <span className="h-2 w-2 rounded-full" style={{
+            background: tokens.forest,
+            animation: 'pulse 1.5s infinite'
+          }} />
           System Online
         </div>
-        <p className="text-xs text-surface-400 mt-1">Local AI &middot; On-Premises</p>
+        <p className="text-xs mt-1" style={{ color: tokens.mist }}>Local AI · On-Premises</p>
       </div>
     </aside>
   );

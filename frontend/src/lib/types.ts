@@ -58,6 +58,7 @@ export interface MatchDetail {
   discrepancies: Discrepancy[] | null;
   po_data: Record<string, any> | null;
   grn_data: Record<string, any> | null;
+  invoice_file_path: string | null;
 }
 
 export interface ProcessingResult {
@@ -79,17 +80,23 @@ export interface HealthStatus {
   orchestrator: string;
   vision_ocr: {
     ollama_status: string;
+    groq_status: string;
     model: string;
+    vision_model: string;
     model_available: boolean;
     available_models?: string[];
     error?: string;
   };
   erp: {
+    total_vendors?: number;
+    total_materials?: number;
     total_purchase_orders: number;
-    total_goods_receipts: number;
-    total_po_value: number;
-    unique_vendors: number;
     total_po_lines?: number;
+    total_goods_receipts: number;
+    unique_vendors: number;
+    cache_size?: number;
+    data_source?: string;
+    total_po_value?: number;
   };
   timestamp: string;
 }

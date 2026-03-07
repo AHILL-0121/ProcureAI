@@ -3,6 +3,8 @@
 import { useState, useCallback } from 'react';
 import { apiUpload } from '@/lib/utils';
 import type { ProcessingResult } from '@/lib/types';
+import { tokens } from '@/lib/design-tokens';
+import { Badge } from './UIComponents';
 
 export default function Header() {
   const [uploading, setUploading] = useState(false);
@@ -29,32 +31,43 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 glass-header">
+    <header className="flex items-center justify-between px-6 py-3 warm-header">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-medium bg-gradient-to-r from-surface-500 to-surface-400 bg-clip-text text-transparent">Intelligent Procurement Automation</h2>
+        <h2 className="text-sm font-medium" style={{
+          background: `linear-gradient(to right, ${tokens.slate}, ${tokens.mist})`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text'
+        }}>Intelligent Procurement Automation</h2>
       </div>
 
       <div className="flex items-center gap-4">
         {/* Upload Result Badge */}
         {lastResult && (
-          <div className={`animate-slide-in-right text-xs px-3 py-1.5 rounded-full font-medium backdrop-blur-sm ${
-            lastResult.status === 'SUCCESS'
-              ? 'bg-emerald-100/80 text-emerald-700 border border-emerald-200/50'
-              : 'bg-red-100/80 text-red-700 border border-red-200/50'
-          }`}>
-            {lastResult.status === 'SUCCESS'
-              ? `[ok] ${lastResult.match_result} - ${lastResult.invoice_number}`
-              : `[x] ${lastResult.error}`}
+          <div className="animate-slide-in-right">
+            <Badge type={lastResult.status === 'SUCCESS' ? 'MATCHED' : 'FAILED'} />
+            <span className="ml-2 text-xs" style={{ color: tokens.slate }}>
+              {lastResult.status === 'SUCCESS'
+                ? `${lastResult.match_result} - ${lastResult.invoice_number}`
+                : lastResult.error}
+            </span>
           </div>
         )}
 
         {/* Upload Button */}
-        <label className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-300 ${
-          uploading
-            ? 'glass text-surface-400 cursor-wait'
-            : 'btn-primary hover:scale-105'
-        }`}>
-          <UploadIcon className={`h-4 w-4 ${uploading ? 'animate-spin-slow' : ''}`} />
+        <label 
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-300"
+          style={{
+            background: uploading 
+              ? tokens.sand 
+              : `linear-gradient(135deg, ${tokens.amber}, ${tokens.ember})`,
+            color: 'white',
+            boxShadow: uploading ? 'none' : `0 4px 14px ${tokens.amber}50`,
+            cursor: uploading ? 'wait' : 'pointer',
+            opacity: uploading ? 0.6 : 1
+          }}
+        >
+          <UploadIcon className={`h-4 w-4 ${uploading ? 'animate-spin' : ''}`} />
           {uploading ? 'Processing...' : 'Upload Invoice'}
           <input
             type="file"

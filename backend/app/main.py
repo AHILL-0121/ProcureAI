@@ -13,6 +13,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -27,6 +28,7 @@ from app.schemas import (
 from app.agents.orchestrator import OrchestratorAgent
 from app.agents.email_intake import EmailIntakeAgent, polling_state
 from app.agents.erp_integration import ERPIntegrationAgent
+from app.agents.vision_ocr import VisionOCRAgent
 
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
@@ -144,6 +146,21 @@ async def lifespan(app: FastAPI):
             settings.email_polling_enabled = False
     else:
         logger.warning("📧 IMAP check skipped — EMAIL_USER / EMAIL_PASSWORD not set in .env")
+
+    # ── LLM connectivity check ──
+    try:
+        logger.info("🤖 Checking Groq API connection...")
+        vision_agent = VisionOCRAgent()
+        health_status = vision_agent.health_check()
+        
+        if health_status.get("groq_status") == "online" and health_status.get("model_available"):
+            logger.info(f"✅ Groq API ready — text: {health_status.get('model')}, vision: {health_status.get('vision_model')}")
+        else:
+            logger.error("❌ Groq API check FAILED")
+            logger.error(f"   Error: {health_status.get('error', 'Unknown error')}")
+            logger.warning("   Invoice processing will fail until Groq API is configured")
+    except Exception as llm_err:
+        logger.error(f"❌ LLM initialization error: {llm_err}")
 
     # Start background email polling if credentials are configured
     if settings.email_polling_enabled and settings.email_user:
@@ -327,36 +344,59 @@ async def list_matches(
             discrepancies=inv.discrepancies,
             po_data=po_data,
             grn_data=grn_data,
+            invoice_file_path=inv.file_path,
         ))
 
     return {"matches": [m.model_dump() for m in matches], "total": len(matches)}
+
+
+@app.get("/api/documents/invoice/{invoice_id}")
+async def view_invoice_document(invoice_id: str, db: Session = Depends(get_db)):
+    """Serve invoice document file for viewing."""
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if not invoice.file_path or not os.path.exists(invoice.file_path):
+        raise HTTPException(status_code=404, detail="Invoice document file not found")
+    
+    return FileResponse(
+        invoice.file_path,
+        media_type="application/pdf" if invoice.file_path.endswith(".pdf") else "image/jpeg",
+        filename=os.path.basename(invoice.file_path)
+    )
 
 
 # ──────────── Dashboard Stats ────────────
 
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
 async def dashboard_stats(db: Session = Depends(get_db)):
-    """Get aggregated dashboard statistics."""
-    total = db.query(func.count(Invoice.id)).scalar() or 0
-    matched = db.query(func.count(Invoice.id)).filter(Invoice.match_result == MatchResult.FULL_MATCH).scalar() or 0
-    partial = db.query(func.count(Invoice.id)).filter(Invoice.match_result == MatchResult.PARTIAL_MATCH).scalar() or 0
-    no_match = db.query(func.count(Invoice.id)).filter(Invoice.match_result == MatchResult.NO_MATCH).scalar() or 0
-    pending = db.query(func.count(Invoice.id)).filter(Invoice.match_result == MatchResult.PENDING).scalar() or 0
-    failed = db.query(func.count(Invoice.id)).filter(Invoice.status == InvoiceStatus.FAILED).scalar() or 0
-    total_value = db.query(func.sum(Invoice.total_amount)).scalar() or 0.0
-    avg_time = db.query(func.avg(Invoice.processing_time)).filter(Invoice.processing_time.isnot(None)).scalar() or 0.0
-    avg_conf = db.query(func.avg(Invoice.confidence_score)).filter(Invoice.confidence_score > 0).scalar() or 0.0
+    """Get aggregated dashboard statistics with a single optimized query."""
+    # Single query to get all counts and aggregates
+    from sqlalchemy import case
+    
+    stats = db.query(
+        func.count(Invoice.id).label('total'),
+        func.sum(case((Invoice.match_result == MatchResult.FULL_MATCH, 1), else_=0)).label('matched'),
+        func.sum(case((Invoice.match_result == MatchResult.PARTIAL_MATCH, 1), else_=0)).label('partial'),
+        func.sum(case((Invoice.match_result == MatchResult.NO_MATCH, 1), else_=0)).label('no_match'),
+        func.sum(case((Invoice.match_result == MatchResult.PENDING, 1), else_=0)).label('pending'),
+        func.sum(case((Invoice.status == InvoiceStatus.FAILED, 1), else_=0)).label('failed'),
+        func.sum(Invoice.total_amount).label('total_value'),
+        func.avg(Invoice.processing_time).label('avg_time'),
+        func.avg(case((Invoice.confidence_score > 0, Invoice.confidence_score), else_=None)).label('avg_conf'),
+    ).first()
 
     return DashboardStats(
-        total_invoices=total,
-        matched=matched,
-        partial_match=partial,
-        no_match=no_match,
-        pending=pending,
-        failed=failed,
-        total_value=round(total_value, 2),
-        avg_processing_time=round(avg_time, 2),
-        avg_confidence=round(avg_conf, 2),
+        total_invoices=stats.total or 0,
+        matched=stats.matched or 0,
+        partial_match=stats.partial or 0,
+        no_match=stats.no_match or 0,
+        pending=stats.pending or 0,
+        failed=stats.failed or 0,
+        total_value=round(stats.total_value or 0.0, 2),
+        avg_processing_time=round(stats.avg_time or 0.0, 2),
+        avg_confidence=round(stats.avg_conf or 0.0, 2),
     )
 
 

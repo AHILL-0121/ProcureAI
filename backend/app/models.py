@@ -121,3 +121,79 @@ class AuditLog(Base):
     action = Column(String)
     details = Column(JSON, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+# ============================================================================
+# ERP Dataset Models (Oracle Migration Dataset)
+# ============================================================================
+
+class Vendor(Base):
+    """Vendor/Supplier master data from Oracle ERP"""
+    __tablename__ = "erp_vendors"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    supplier_id = Column(String, unique=True, index=True)  # Original SUPPLIER_ID
+    supplier_name = Column(String)
+    supplier_type = Column(String, nullable=True)
+    tax_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Material(Base):
+    """Material/Item master data from Oracle ERP"""
+    __tablename__ = "erp_materials"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    item_id = Column(String, unique=True, index=True)  # Original ITEM_ID
+    description = Column(String)
+    category = Column(String, nullable=True)
+    uom = Column(String, nullable=True)  # Unit of Measure
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class POHeader(Base):
+    """Purchase Order Header from Oracle ERP"""
+    __tablename__ = "erp_po_headers"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    po_header_id = Column(String, unique=True, index=True)  # Original PO_HEADER_ID
+    po_number = Column(String, unique=True, index=True)
+    supplier_id = Column(String, ForeignKey("erp_vendors.supplier_id"))
+    creation_date = Column(String)
+    currency = Column(String, default="USD")
+    status = Column(String, default="OPEN")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    lines = relationship("POLine", back_populates="header", cascade="all, delete-orphan")
+
+
+class POLine(Base):
+    """Purchase Order Line Item from Oracle ERP"""
+    __tablename__ = "erp_po_lines"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    po_line_id = Column(String, unique=True, index=True)  # Original PO_LINE_ID
+    po_header_id = Column(String, ForeignKey("erp_po_headers.po_header_id"))
+    line_num = Column(Integer)
+    item_id = Column(String, ForeignKey("erp_materials.item_id"))
+    quantity = Column(Float)
+    unit_price = Column(Float)
+    line_amount = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    header = relationship("POHeader", back_populates="lines")
+
+
+class GoodsReceiptERP(Base):
+    """Goods Receipt Note from Oracle ERP"""
+    __tablename__ = "erp_goods_receipts"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    receipt_id = Column(String, unique=True, index=True)  # Original GRN ID
+    po_line_id = Column(String, ForeignKey("erp_po_lines.po_line_id"))
+    quantity_received = Column(Float)
+    receipt_date = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    action = Column(String)
+    details = Column(JSON, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)

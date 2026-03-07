@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     # Ollama
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:latest"
+    
+    # Groq (fallback when Ollama is unavailable)
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
 
     # Database
     database_url: str = "sqlite:///./procureai.db"

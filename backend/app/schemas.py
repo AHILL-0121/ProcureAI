@@ -104,3 +104,4 @@ class MatchDetailResponse(BaseModel):
     discrepancies: Optional[list] = None
     po_data: Optional[dict] = None
     grn_data: Optional[dict] = None
+    invoice_file_path: Optional[str] = None

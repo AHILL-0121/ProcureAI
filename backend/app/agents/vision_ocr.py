@@ -57,11 +57,14 @@ Rules:
 
 
 class VisionOCRAgent:
-    """Extract structured invoice data using Llama 3.1 via Ollama."""
+    """Extract structured invoice data using Groq (Llama models)."""
 
     def __init__(self):
-        self.ollama_url = settings.ollama_base_url
-        self.model = settings.ollama_model
+        self.groq_api_key = settings.groq_api_key
+        self.groq_model = settings.groq_model
+        self.groq_vision_model = "llama-3.2-90b-vision-preview"
+        if not self.groq_api_key:
+            raise ValueError("GROQ_API_KEY is required in environment")
 
     def _extract_text_from_pdf(self, file_path: str) -> str:
         """Extract raw text from PDF using PyPDF2."""
@@ -94,7 +97,7 @@ class VisionOCRAgent:
             return ""
 
     def _extract_invoice_from_image_vision(self, file_path: str) -> dict:
-        """Use llama3.2-vision model to extract invoice data directly from image."""
+        """Use llama3.2-vision model to extract invoice data directly from image with Groq fallback."""
         with open(file_path, "rb") as f:
             image_bytes = f.read()
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -136,50 +139,68 @@ Rules:
 - Identify GSTIN/tax IDs as vendor_id
 - If a field is not found, use null"""
 
+        # Use Groq vision model (llama-3.2-90b-vision-preview)
         try:
             response = httpx.post(
-                f"{self.ollama_url}/api/generate",
-                json={
-                    "model": "llama3.2-vision:11b",
-                    "prompt": prompt,
-                    "images": [image_b64],
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.1,
-                        "num_predict": 2048,
-                    }
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.groq_api_key}",
+                    "Content-Type": "application/json"
                 },
-                timeout=120.0
-            )
-            response.raise_for_status()
-            raw_response = response.json().get("response", "")
-            logger.info(f"Vision model returned {len(raw_response)} chars for {Path(file_path).name}")
-            return self._parse_json_response(raw_response)
-        except Exception as e:
-            logger.error(f"Vision model extraction failed: {e}")
-            raise
-
-    def _call_llama(self, prompt: str) -> str:
-        """Call Llama 3.1 via Ollama API."""
-        try:
-            response = httpx.post(
-                f"{self.ollama_url}/api/generate",
                 json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.1,
-                        "num_predict": 2048,
-                    }
+                    "model": self.groq_vision_model,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{image_b64}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 2048
                 },
                 timeout=60.0
             )
             response.raise_for_status()
-            return response.json().get("response", "")
+            raw_response = response.json()["choices"][0]["message"]["content"]
+            logger.info(f"Groq vision extracted {len(raw_response)} chars from {Path(file_path).name}")
+            return self._parse_json_response(raw_response)
         except Exception as e:
-            logger.error(f"Llama API call failed: {e}")
-            raise
+            logger.error(f"Groq vision extraction failed: {e}")
+            raise Exception(f"Invoice extraction failed: {e}")
+
+    def _call_llama(self, prompt: str) -> str:
+        """Call Groq API (Llama 3.3 70B)."""
+        try:
+            response = httpx.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.groq_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.groq_model,
+                    "messages": [
+                        {"role": "system", "content": "You are an expert invoice data extraction system. Return only valid JSON, no markdown or explanations."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 2048
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.error(f"Groq API call failed: {e}")
+            raise Exception(f"LLM extraction failed: {e}")
 
     @staticmethod
     def _sanitize_json(raw: str) -> str:
@@ -238,36 +259,20 @@ Rules:
 
     def extract_invoice_data(self, file_path: str) -> dict:
         """
-        Main extraction pipeline:
-        1. Extract text from PDF/image
-        2. Send to Llama 3.1 for structured extraction
+        Main extraction pipeline using Tesseract OCR:
+        1. Extract text from PDF/image using Tesseract
+        2. Send to Groq Llama for structured extraction
         3. Return parsed JSON with confidence score
         """
         start_time = time.time()
         path = Path(file_path)
 
-        # Step 1: Extract raw text
+        # Step 1: Extract raw text using Tesseract OCR
         if path.suffix.lower() in (".png", ".jpg", ".jpeg"):
-            # Use Tesseract OCR for images, fall back to vision model
             logger.info(f"Using Tesseract OCR for image: {path.name}")
             raw_text = self._extract_text_from_image(file_path)
             if not raw_text.strip():
-                # Fallback: try llama3.2-vision
-                logger.warning("Tesseract returned no text, trying llama3.2-vision...")
-                try:
-                    extracted = self._extract_invoice_from_image_vision(file_path)
-                    processing_time = time.time() - start_time
-                    logger.info(f"Vision extraction completed in {processing_time:.2f}s")
-                    extracted["_metadata"] = {
-                        "source_file": path.name,
-                        "raw_text_length": 0,
-                        "processing_time_seconds": round(processing_time, 2),
-                        "model": "llama3.2-vision:11b",
-                        "confidence_score": self._calculate_confidence(extracted)
-                    }
-                    return extracted
-                except Exception as e:
-                    raise ValueError(f"No text could be extracted from image. Tesseract and vision model both failed: {e}")
+                raise ValueError(f"Tesseract OCR could not extract text from {path.name}. Please ensure the image is clear and contains readable text.")
         elif path.suffix.lower() == ".pdf":
             raw_text = self._extract_text_from_pdf(file_path)
         elif path.suffix.lower() == ".txt":
@@ -281,7 +286,7 @@ Rules:
 
         logger.info(f"Extracted {len(raw_text)} chars from {path.name}")
 
-        # Step 2: Send to Llama for structured extraction
+        # Step 2: Send to Groq Llama for structured extraction
         prompt = EXTRACTION_PROMPT.format(invoice_text=raw_text[:4000])  # Limit context
         llama_response = self._call_llama(prompt)
 
@@ -296,7 +301,9 @@ Rules:
             "source_file": path.name,
             "raw_text_length": len(raw_text),
             "processing_time_seconds": round(processing_time, 2),
-            "model": self.model,
+            "extraction_method": "tesseract_ocr",
+            "model": self.groq_model,
+            "llm_provider": "groq",
             "confidence_score": self._calculate_confidence(extracted)
         }
 
@@ -330,21 +337,19 @@ Rules:
         return round(score / total_weight, 2) if total_weight > 0 else 0.0
 
     def health_check(self) -> dict:
-        """Check if Ollama and the model are available."""
-        try:
-            response = httpx.get(f"{self.ollama_url}/api/tags", timeout=5.0)
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            model_names = [m["name"] for m in models]
-            model_available = any(self.model in name for name in model_names)
-            return {
-                "ollama_status": "online",
-                "model": self.model,
-                "model_available": model_available,
-                "available_models": model_names
-            }
-        except Exception as e:
-            return {
-                "ollama_status": "offline",
-                "error": str(e)
-            }
+        """Check if Groq API is available (fast check)."""
+        status = {
+            "ollama_status": "not_used",
+            "groq_status": "online",
+            "model": self.groq_model,
+            "vision_model": self.groq_vision_model,
+            "model_available": True
+        }
+        
+        # Quick validation - just check if API key exists
+        if not self.groq_api_key:
+            status["groq_status"] = "not_configured"
+            status["model_available"] = False
+            status["error"] = "GROQ_API_KEY not set"
+        
+        return status

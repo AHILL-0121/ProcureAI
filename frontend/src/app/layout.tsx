@@ -16,11 +16,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <WebSocketProvider>
           <ToastProvider>
-            {/* Animated background orbs */}
-            <div className="bg-orb w-96 h-96 bg-emerald-200/40 top-[-10%] left-[-5%] animate-float" />
-            <div className="bg-orb w-80 h-80 bg-teal-200/30 bottom-[10%] right-[-5%] animate-float" style={{ animationDelay: '3s' }} />
-            <div className="bg-orb w-64 h-64 bg-cyan-200/20 top-[40%] left-[30%] animate-float" style={{ animationDelay: '5s' }} />
-
             <div className="relative z-10 flex h-screen overflow-hidden">
               <Sidebar />
               <div className="flex flex-1 flex-col overflow-hidden">

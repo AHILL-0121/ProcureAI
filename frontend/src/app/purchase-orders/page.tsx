@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, formatCurrency, cn } from '@/lib/utils';
 import { POPageSkeleton } from '@/components/Skeletons';
+import { tokens } from '@/lib/design-tokens';
 
 interface POLineItem {
   item_code: string;
@@ -78,8 +79,13 @@ export default function PurchaseOrdersPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="animate-fade-in-down">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-surface-900 to-surface-600 bg-clip-text text-transparent">Purchase Orders</h1>
-        <p className="text-sm text-surface-400">Oracle ERP Dataset &mdash; {pos.length} POs loaded</p>
+        <h1 className="text-2xl font-bold" style={{
+          background: `linear-gradient(to right, ${tokens.charcoal}, ${tokens.slate})`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text'
+        }}>Purchase Orders</h1>
+        <p className="text-sm" style={{ color: tokens.mist }}>Oracle ERP Dataset — {pos.length} POs loaded</p>
       </div>
 
       {/* Search */}
@@ -89,22 +95,22 @@ export default function PurchaseOrdersPage() {
           placeholder="Search by vendor name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="glass-input px-4 py-2.5 rounded-xl text-sm w-full max-w-md outline-none"
+          className="warm-input px-4 py-2.5 w-full max-w-md"
         />
       </div>
 
       {/* Table */}
-      <div className="glass-table animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+      <div className="warm-card overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-primary-500/10 bg-primary-500/5">
-                <th className="text-left px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">PO Number</th>
-                <th className="text-left px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Vendor</th>
-                <th className="text-left px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Order Date</th>
-                <th className="text-right px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Amount</th>
-                <th className="text-center px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Status</th>
-                <th className="text-center px-4 py-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Items</th>
+              <tr style={{ borderBottom: `1px solid ${tokens.sand}80`, background: tokens.parchment }}>
+                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>PO Number</th>
+                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Vendor</th>
+                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Order Date</th>
+                <th className="text-right px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Amount</th>
+                <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Status</th>
+                <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wider" style={{ color: tokens.slate }}>Items</th>
               </tr>
             </thead>
             <tbody className="stagger-children">
@@ -112,18 +118,24 @@ export default function PurchaseOrdersPage() {
                 <tr
                   key={po.po_number}
                   onClick={() => selectPO(po)}
-                  className="border-b border-white/10 hover:bg-primary-500/5 cursor-pointer transition-all duration-200 group"
+                  className="cursor-pointer transition-all duration-200 group"
+                  style={{ borderBottom: `1px solid ${tokens.sand}40` }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = `${tokens.amber}08`}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
-                  <td className="px-4 py-3.5 font-mono text-sm font-medium text-primary-700 group-hover:text-primary-600 transition-colors">{po.po_number}</td>
-                  <td className="px-4 py-3.5 text-surface-700">{po.vendor_name}</td>
-                  <td className="px-4 py-3.5 text-surface-400 text-xs">{po.order_date}</td>
-                  <td className="px-4 py-3.5 text-right font-medium text-surface-800">{formatCurrency(po.total_amount)}</td>
+                  <td className="px-4 py-3.5 font-mono text-sm font-medium transition-colors" style={{ color: tokens.amber }}>{po.po_number}</td>
+                  <td className="px-4 py-3.5" style={{ color: tokens.charcoal }}>{po.vendor_name}</td>
+                  <td className="px-4 py-3.5 text-xs" style={{ color: tokens.mist }}>{po.order_date}</td>
+                  <td className="px-4 py-3.5 text-right font-medium" style={{ color: tokens.charcoal }}>{formatCurrency(po.total_amount)}</td>
                   <td className="px-4 py-3.5 text-center">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100/80 text-emerald-700 backdrop-blur-sm">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium" style={{
+                      background: `${tokens.forest}20`,
+                      color: tokens.forest
+                    }}>
                       {po.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-center text-surface-500">{po.line_count}</td>
+                  <td className="px-4 py-3.5 text-center" style={{ color: tokens.slate }}>{po.line_count}</td>
                 </tr>
               ))}
             </tbody>
