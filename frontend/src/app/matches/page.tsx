@@ -173,7 +173,10 @@ function MatchDetailModal({ match, onClose }: { match: MatchDetail; onClose: () 
               <p className="text-xs truncate" style={{ color: tokens.mist }}>{formatCurrency(match.total_amount)}</p>
               {match.invoice_file_path && (
                 <button
-                  onClick={() => window.open(`http://localhost:8001/api/documents/invoice/${match.invoice_id}`, '_blank')}
+                  onClick={() => {
+                    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
+                    window.open(`${apiBase}/documents/invoice/${match.invoice_id}`, '_blank');
+                  }}
                   className="mt-2 text-xs px-3 py-1.5 rounded-lg transition-all duration-200 hover:scale-105 w-full"
                   style={{ 
                     background: tokens.forest,

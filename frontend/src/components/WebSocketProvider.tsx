@@ -28,7 +28,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(() => {
     try {
-      const ws = new WebSocket('ws://localhost:8001/ws');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
+      const wsUrl = apiUrl.replace('http', 'ws').replace('/api', '/ws');
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         setIsConnected(true);
