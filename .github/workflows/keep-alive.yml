@@ -1,0 +1,22 @@
+name: Keep Server Active
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping-server:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping health endpoint
+        run: |
+          echo "Pinging server at $(date)"
+          curl -I https://procureai-p1i2.onrender.com/api/health
+          echo "Ping completed successfully"
+        continue-on-error: true
+      
+      - name: Log result
+        run: echo "Health check executed at $(date)"

@@ -7,7 +7,6 @@ dist/
 build/
 *.egg
 .eggs/
-.github
 
 # Virtual environment
 backend/venv/
