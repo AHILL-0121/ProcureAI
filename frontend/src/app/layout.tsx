@@ -7,7 +7,10 @@ import { ToastProvider } from '@/components/Toast';
 
 export const metadata: Metadata = {
   title: 'ProcureAI - Intelligent Procurement Automation',
-  description: 'Multi-Agent AI System for Three-Way Match Automation powered by Llama 3.1',
+  description: 'Multi-Agent AI System for Three-Way Match Automation powered by Groq API (Llama 3.3)',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="#15803D" stroke="#D97706" stroke-width="2"/>
+  
+  <!-- Document icon -->
+  <rect x="10" y="8" width="12" height="16" rx="1" fill="#FDFAF4"/>
+  
+  <!-- Lines representing text -->
+  <line x1="12" y1="11" x2="20" y2="11" stroke="#15803D" stroke-width="1" stroke-linecap="round"/>
+  <line x1="12" y1="14" x2="20" y2="14" stroke="#15803D" stroke-width="1" stroke-linecap="round"/>
+  <line x1="12" y1="17" x2="18" y2="17" stroke="#15803D" stroke-width="1" stroke-linecap="round"/>
+  
+  <!-- Checkmark -->
+  <circle cx="24" cy="24" r="5" fill="#4ADE80"/>
+  <path d="M22 24 L23.5 25.5 L26 22.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
