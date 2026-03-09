@@ -199,6 +199,20 @@ app.add_middleware(
 )
 
 
+# ──────────── Root Route ────────────
+
+@app.get("/")
+async def root():
+    """Root endpoint - basic API info."""
+    return {
+        "name": "ProcureAI API",
+        "version": "1.0.0",
+        "status": "online",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
+
 # ──────────── WebSocket ────────────
 
 @app.websocket("/ws")
