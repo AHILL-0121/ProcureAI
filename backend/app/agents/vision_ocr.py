@@ -86,8 +86,16 @@ class VisionOCRAgent:
         try:
             import pytesseract
             from PIL import Image
-            # Set explicit Tesseract path on Windows
-            pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+            import platform
+            import os
+            
+            # Set Tesseract path only on Windows if not in PATH
+            if platform.system() == 'Windows':
+                windows_tesseract_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+                if os.path.exists(windows_tesseract_path):
+                    pytesseract.pytesseract.tesseract_cmd = windows_tesseract_path
+            # On Linux (Render/Docker), tesseract is in PATH and installed at /usr/bin/tesseract
+            
             image = Image.open(file_path)
             text = pytesseract.image_to_string(image)
             logger.info(f"Tesseract extracted {len(text)} chars from {Path(file_path).name}")
