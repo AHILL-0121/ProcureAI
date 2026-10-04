@@ -1,20 +1,32 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
 from app.config import settings
 
-# Use PostgreSQL
-SQLALCHEMY_DATABASE_URL = settings.database_url
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,  # PostgreSQL connection health check
-    pool_size=10,
-    max_overflow=20
-)
+def _make_engine(url: str):
+    if url.startswith("sqlite"):   # used only by the automated test suite
+        engine = create_engine(url, connect_args={"check_same_thread": False})
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+        @event.listens_for(engine, "connect")
+        def _sqlite_pragmas(dbapi_conn, _):
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.close()
+
+        return engine
+    # Neon suspends idle computes and drops idle connections: check before use and recycle often
+    return create_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=5, pool_recycle=300,
+                         connect_args={"connect_timeout": 15})
+
+
+engine = _make_engine(settings.database_url)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 def get_db():
@@ -26,5 +38,7 @@ def get_db():
 
 
 def init_db():
-    """Create all database tables."""
+    """Create tables directly. Used only by the test suite; the real schema is managed by Alembic (app.migrate)."""
+    import app.models  # noqa: F401  (register models)
+
     Base.metadata.create_all(bind=engine)
