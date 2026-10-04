@@ -1,0 +1,23 @@
+==============================================================================
+                                 TAX INVOICE                                  
+==============================================================================
+Supplier_6
+Unit 4, Industrial Estate
+Tax ID: TAX0006
+
+Invoice Number: INV-DEMO-009
+Invoice Date:   2026-09-14
+PO Reference:   PO-000004
+Currency:       GBP
+Payment Terms:  NET15
+
+Bill To: ProcureAI Demo Corp, Accounts Payable
+------------------------------------------------------------------------------
+ITEM       DESCRIPTION                    QTY UOM  UNIT PRICE       AMOUNT
+------------------------------------------------------------------------------
+ITEM-018   Material Description 18        251 KG        70.59    17,718.09
+------------------------------------------------------------------------------
+                                                        Subtotal    17,718.09
+                                                       Tax (10%)     1,771.81
+                                                       TOTAL DUE    19,489.90
+

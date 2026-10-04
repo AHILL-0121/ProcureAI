@@ -1,35 +1,33 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import { WebSocketProvider } from '@/components/WebSocketProvider';
-import { ToastProvider } from '@/components/Toast';
+import type { Metadata, Viewport } from 'next';
+import { Caveat, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed, Libre_Caslon_Display } from 'next/font/google';
+import { InkDefs } from '@/components/ui';
+import { Providers } from './providers';
+import '@/styles/tokens.css';
+import '@/styles/base.css';
+import '@/styles/app.css';
+import '@/styles/screens.css';
+import '@/styles/landing.css';
+
+const caslon = Libre_Caslon_Display({ weight: '400', subsets: ['latin'], variable: '--font-caslon', display: 'swap' });
+const plex = IBM_Plex_Sans({ weight: ['400', '500', '600'], subsets: ['latin'], variable: '--font-plex', display: 'swap' });
+const plexCond = IBM_Plex_Sans_Condensed({ weight: ['500', '600', '700'], subsets: ['latin'], variable: '--font-plex-cond', display: 'swap' });
+const plexMono = IBM_Plex_Mono({ weight: ['400', '500', '600'], subsets: ['latin'], variable: '--font-plex-mono', display: 'swap' });
+const caveat = Caveat({ weight: ['500', '600'], subsets: ['latin'], variable: '--font-caveat', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'ProcureAI - Intelligent Procurement Automation',
-  description: 'Multi-Agent AI System for Three-Way Match Automation powered by Groq API (Llama 3.3)',
-  icons: {
-    icon: '/favicon.svg',
-  },
+  title: { default: 'ProcureAI', template: '%s · ProcureAI' },
+  description: 'Three copies, one stamp. Automated three-way invoice matching with a human in-tray for exceptions.',
+  icons: { icon: '/favicon.svg' },
 };
+
+export const viewport: Viewport = { themeColor: '#ECE9E1', colorScheme: 'light' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
-        <WebSocketProvider>
-          <ToastProvider>
-            <div className="relative z-10 flex h-screen overflow-hidden">
-              <Sidebar />
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-6">
-                  {children}
-                </main>
-              </div>
-            </div>
-          </ToastProvider>
-        </WebSocketProvider>
+    <html lang="en" data-fx="full" className={`${caslon.variable} ${plex.variable} ${plexCond.variable} ${plexMono.variable} ${caveat.variable}`}>
+      <body>
+        <InkDefs />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

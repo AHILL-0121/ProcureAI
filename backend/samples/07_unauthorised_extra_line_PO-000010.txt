@@ -1,0 +1,24 @@
+==============================================================================
+                                 TAX INVOICE                                  
+==============================================================================
+Supplier_6
+Unit 4, Industrial Estate
+Tax ID: TAX0006
+
+Invoice Number: INV-DEMO-007
+Invoice Date:   2026-09-14
+PO Reference:   PO-000010
+Currency:       USD
+Payment Terms:  NET15
+
+Bill To: ProcureAI Demo Corp, Accounts Payable
+------------------------------------------------------------------------------
+ITEM       DESCRIPTION                    QTY UOM  UNIT PRICE       AMOUNT
+------------------------------------------------------------------------------
+ITEM-001   Material Description 1         317 KG       182.94    57,991.98
+SVC-900    Expedited freight surcharge       1 EA       450.00       450.00
+------------------------------------------------------------------------------
+                                                        Subtotal    58,441.98
+                                                       Tax (10%)     5,844.20
+                                                       TOTAL DUE    64,286.18
+
