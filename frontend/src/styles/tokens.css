@@ -1,0 +1,63 @@
+/* Triplicate design tokens — light only, no hue between 250° and 330° (see plan/Design.md) */
+:root {
+  color-scheme: light;
+
+  /* the desk and the paper */
+  --desk: #ECE9E1;
+  --desk-deep: #E2DED3;
+  --paper: #FBFAF6;
+  --paper-white: #FFFFFF;
+  --copy-canary: #FBF1C7;
+  --copy-pink: #F8E3E1;
+  --rule: #DAD5C8;
+  --rule-soft: #E8E4DA;
+  --rule-ledger: #CBD8EA;
+  --rule-margin: #E6B3AC;
+
+  /* ink */
+  --ink: #1A1C20;
+  --ink-2: #4A4F58;
+  --ink-3: #6A6F77;
+  --carbon: #24407F;
+  --carbon-hover: #1B3266;
+  --carbon-wash: rgba(36, 64, 127, 0.08);
+  --highlighter: #FFE45C;
+
+  /* status inks */
+  --ok: #2E7D4F;
+  --hold: #9A5B00;
+  --bad: #B8322A;
+  --info: #24407F;
+  --pencil: #6A6F77;
+  --ok-wash: rgba(46, 125, 79, 0.1);
+  --hold-wash: rgba(154, 91, 0, 0.1);
+  --bad-wash: rgba(184, 50, 42, 0.09);
+
+  /* type */
+  --f-display: var(--font-caslon), "Libre Caslon Text", Georgia, "Times New Roman", serif;
+  --f-sans: var(--font-plex), "Segoe UI", system-ui, sans-serif;
+  --f-cond: var(--font-plex-cond), "Arial Narrow", var(--font-plex), sans-serif;
+  --f-mono: var(--font-plex-mono), ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --f-hand: var(--font-caveat), "Segoe Print", "Bradley Hand", cursive;
+
+  /* shape */
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --shadow-sheet: 0 1px 0 #fff inset, 0 1px 2px rgba(26, 28, 32, 0.06), 0 6px 16px -8px rgba(26, 28, 32, 0.18);
+  --shadow-lift: 0 1px 2px rgba(26, 28, 32, 0.08), 0 14px 30px -12px rgba(26, 28, 32, 0.3);
+  --perforation: radial-gradient(circle, var(--desk) 1.6px, transparent 1.8px);
+
+  /* motion */
+  --t-key: 80ms;
+  --t-quick: 180ms;
+  --t-sheet: 280ms;
+  --ease-paper: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* density */
+  --row-h: 48px;
+}
+
+:root[data-density="ledger"] {
+  --row-h: 34px;
+}
