@@ -1,0 +1,23 @@
+==============================================================================
+                                 TAX INVOICE                                  
+==============================================================================
+Supplier_3
+Unit 4, Industrial Estate
+Tax ID: TAX0003
+
+Invoice Number: INV-DEMO-005
+Invoice Date:   2026-09-14
+PO Reference:   PO-999999
+Currency:       GBP
+Payment Terms:  NET30
+
+Bill To: ProcureAI Demo Corp, Accounts Payable
+------------------------------------------------------------------------------
+ITEM       DESCRIPTION                    QTY UOM  UNIT PRICE       AMOUNT
+------------------------------------------------------------------------------
+ITEM-015   Material Description 15          5 LTR      453.42     2,267.10
+------------------------------------------------------------------------------
+                                                        Subtotal     2,267.10
+                                                       Tax (10%)       226.71
+                                                       TOTAL DUE     2,493.81
+
