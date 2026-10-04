@@ -1,244 +1,323 @@
 """
-Agent 5: Matching & Reconciliation Agent
-Performs three-way match: Invoice vs. PO vs. Receipt.
-Flags discrepancies with configurable tolerances.
+Agent 5: Three-way matching (invoice ↔ purchase order ↔ goods receipt), at line level.
+
+The rule a clerk applies: pay for what was ordered AND received, at the ordered price, once.
+
+For every invoice line we find the PO line it refers to (one-to-one), then check
+  price     invoice unit price vs PO unit price (tolerance: % and absolute)
+  receipt   invoiced qty vs (received qty − qty already billed)
+  order     cumulative billed qty vs ordered qty
+  unit      unit of measure
+Header checks: PO exists and is open, vendor matches the PO vendor, currency matches, and the
+invoice net equals what the matched lines justify (catches unexplained fees).
+
+PO lines that are not on the invoice are informational only: an unreceived line the supplier
+has not billed is not a reason to hold the invoice.
+
+This module is pure (no database, no I/O) so it can be tested exhaustively.
 """
 
-import logging
+from __future__ import annotations
+
+import re
+from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+HIGH, MEDIUM, LOW = "HIGH", "MEDIUM", "LOW"
 
-# Matching tolerances (from SRS)
-QUANTITY_TOLERANCE = 0.02   # ±2%
-PRICE_TOLERANCE = 0.05      # ±5%
-DESCRIPTION_THRESHOLD = 0.85 # 85% fuzzy match
+
+@dataclass(frozen=True)
+class Tolerance:
+    qty_pct: float = 0.02
+    price_pct: float = 0.05
+    price_abs: float = 0.05
+    total_abs: float = 1.00
+
+    def price_limit(self, po_price: float) -> float:
+        return max(abs(po_price) * self.price_pct, self.price_abs)
+
+    def qty_limit(self, qty: float) -> float:
+        return max(abs(qty) * self.qty_pct, 1e-6)
+
+
+def _norm_code(code: Optional[str]) -> str:
+    return re.sub(r"[^A-Z0-9]", "", (code or "").upper())
+
+
+def _code_digits(code: Optional[str]) -> Optional[int]:
+    m = re.search(r"(\d+)\s*$", code or "")
+    return int(m.group(1)) if m else None
+
+
+def code_matches(inv_code: Optional[str], po_line: dict) -> bool:
+    """Supplier code vs ERP item: exact on item number or item id, or same trailing number (ITEM-015 == ITEM15)."""
+    ic = _norm_code(inv_code)
+    if not ic:
+        return False
+    targets = [_norm_code(po_line.get("item_number")), _norm_code(po_line.get("item_id"))]
+    if ic in [t for t in targets if t]:
+        return True
+    num = _code_digits(inv_code)
+    if num is None:
+        return False
+    item_number = po_line.get("item_number") or ""
+    prefix_inv = re.sub(r"[^A-Z]", "", ic)
+    prefix_po = re.sub(r"[^A-Z]", "", _norm_code(item_number))
+    return bool(prefix_inv) and prefix_inv == prefix_po and num == _code_digits(item_number)
+
+
+def description_score(a: str, b: str) -> float:
+    """Fuzzy similarity that refuses to equate 'Material 1' with 'Material 12'."""
+    a, b = (a or "").lower().strip(), (b or "").lower().strip()
+    if not a or not b:
+        return 0.0
+    score = SequenceMatcher(None, a, b).ratio()
+    da, db = re.findall(r"\d+", a), re.findall(r"\d+", b)
+    if da and db and da != db:
+        score *= 0.5
+    return score
+
+
+def _proximity(x: Optional[float], y: Optional[float]) -> float:
+    if x is None or y is None:
+        return 0.0
+    m = max(abs(x), abs(y))
+    return 1.0 if m == 0 else max(0.0, 1.0 - abs(x - y) / m)
+
+
+def pair_lines(inv_lines: list[dict], po_lines: list[dict]) -> dict[int, int]:
+    """One-to-one assignment {invoice line index: po line index}, greedy by best combined score."""
+    candidates = []
+    for i, il in enumerate(inv_lines):
+        for j, pl in enumerate(po_lines):
+            code = 1.0 if code_matches(il.get("item_code"), pl) else 0.0
+            desc = description_score(il.get("description", ""), pl.get("description", ""))
+            if code == 0.0 and desc < 0.8:
+                continue
+            score = (0.6 * max(code, desc)
+                     + 0.2 * _proximity(il.get("quantity"), pl.get("quantity"))
+                     + 0.2 * _proximity(il.get("unit_price"), pl.get("unit_price")))
+            candidates.append((score + code * 0.5, i, j))   # code matches outrank description matches
+    candidates.sort(reverse=True)
+    used_i, used_j, pairs = set(), set(), {}
+    for _, i, j in candidates:
+        if i in used_i or j in used_j:
+            continue
+        pairs[i] = j
+        used_i.add(i)
+        used_j.add(j)
+    return pairs
+
+
+def _pct(value: float, base: float) -> Optional[float]:
+    return round(value / base * 100, 1) if base else None
+
+
+def _names_match(a: Optional[str], b: Optional[str]) -> Optional[bool]:
+    def n(s):
+        s = re.sub(r"\b(inc|ltd|llc|gmbh|plc|co|corp|limited|pvt|sa|ag|bv)\b\.?", " ", (s or "").lower())
+        return " ".join(re.sub(r"[^a-z0-9]+", " ", s).split())
+    na, nb = n(a), n(b)
+    if not na or not nb:
+        return None
+    return na == nb or SequenceMatcher(None, na, nb).ratio() >= 0.88
+
+
+def _tax(s: Optional[str]) -> str:
+    return re.sub(r"[^A-Z0-9]", "", (s or "").upper())
 
 
 class MatchingAgent:
-    """Three-way matching engine: Invoice ↔ PO ↔ Goods Receipt."""
+    """Kept as a class for the orchestrator; the logic lives in `perform_three_way_match`."""
 
-    def perform_three_way_match(
-        self,
-        invoice_data: dict,
-        po_data: Optional[dict],
-        grn_data: Optional[dict]
-    ) -> dict:
-        """
-        Main matching pipeline:
-        1. Invoice → PO match (2-way)
-        2. PO → GRN match (delivery verification)
-        3. Invoice → GRN match (quantity received)
-        4. Aggregate result
-        """
-        result = {
-            "match_result": "PENDING",
-            "invoice_po_match": None,
-            "po_grn_match": None,
-            "invoice_grn_match": None,
-            "discrepancies": [],
-            "summary": {},
-            "score": 0.0,
-        }
+    def perform_three_way_match(self, invoice: dict, po: Optional[dict], billed: Optional[dict] = None,
+                                tolerance: Optional[Tolerance] = None) -> dict:
+        return perform_three_way_match(invoice, po, billed or {}, tolerance or Tolerance())
 
-        if not po_data:
-            result["match_result"] = "NO_MATCH"
-            result["discrepancies"].append({
-                "type": "MISSING_PO",
-                "severity": "HIGH",
-                "message": f"Purchase Order '{invoice_data.get('po_reference', 'N/A')}' not found in ERP"
-            })
-            return result
 
-        # 1. Invoice ↔ PO matching
-        invoice_po = self._match_invoice_to_po(invoice_data, po_data)
-        result["invoice_po_match"] = invoice_po
+def perform_three_way_match(invoice: dict, po: Optional[dict], billed: dict[str, float],
+                            tol: Tolerance) -> dict:
+    checks: list[dict] = []
 
-        # 2. PO ↔ GRN matching
-        if grn_data:
-            po_grn = self._match_po_to_grn(po_data, grn_data)
-            result["po_grn_match"] = po_grn
-        else:
-            result["discrepancies"].append({
-                "type": "MISSING_GRN",
-                "severity": "MEDIUM",
-                "message": "No Goods Receipt found for this PO - delivery not confirmed"
-            })
+    def add(code: str, severity: str, message: str, passed: bool = False, line: Optional[int] = None, **extra):
+        checks.append({"code": code, "severity": severity, "passed": passed, "message": message,
+                       **({"line": line} if line is not None else {}), **extra})
 
-        # 3. Invoice ↔ GRN matching
-        if grn_data:
-            invoice_grn = self._match_invoice_to_grn(invoice_data, grn_data)
-            result["invoice_grn_match"] = invoice_grn
+    inv_lines = invoice.get("line_items") or []
+    currency = invoice.get("currency")
 
-        # 4. Aggregate discrepancies
-        all_discs = result["discrepancies"]
-        if invoice_po:
-            all_discs.extend(invoice_po.get("discrepancies", []))
-        if result.get("po_grn_match"):
-            all_discs.extend(result["po_grn_match"].get("discrepancies", []))
-        if result.get("invoice_grn_match"):
-            all_discs.extend(result["invoice_grn_match"].get("discrepancies", []))
+    # ---------- PO ----------
+    if not invoice.get("po_reference"):
+        add("MISSING_PO_REFERENCE", HIGH, "The invoice does not quote a purchase order number")
+        return _finish(checks, [], None)
+    if not po:
+        add("MISSING_PO", HIGH, f"Purchase order {invoice['po_reference']} was not found in the ERP")
+        return _finish(checks, [], None)
+    add("PO_FOUND", LOW, f"Purchase order {po['po_number']} found", passed=True)
+    if (po.get("status") or "OPEN").upper() in ("CLOSED", "CANCELLED", "CANCELED"):
+        add("PO_CLOSED", HIGH, f"Purchase order {po['po_number']} is {po['status'].lower()}")
 
-        # Determine overall result
-        high_severity = [d for d in all_discs if d.get("severity") == "HIGH"]
-        medium_severity = [d for d in all_discs if d.get("severity") == "MEDIUM"]
+    # ---------- Vendor ----------
+    inv_tax, po_tax = _tax(invoice.get("vendor_tax_id")), _tax(po.get("vendor_tax_id"))
+    same: Optional[bool]
+    if invoice.get("resolved_vendor_id") and po.get("vendor_id"):
+        same = str(invoice["resolved_vendor_id"]) == str(po["vendor_id"])
+    elif inv_tax and po_tax:
+        same = inv_tax == po_tax
+    else:
+        same = _names_match(invoice.get("vendor_name"), po.get("vendor_name"))
+    if same is None:
+        add("VENDOR_UNVERIFIED", MEDIUM, "The vendor on the invoice could not be verified against the PO vendor")
+    elif same:
+        add("VENDOR_MATCH", LOW, f"Vendor matches PO vendor ({po['vendor_name']})", passed=True)
+    else:
+        add("VENDOR_MISMATCH", HIGH,
+            f"Invoice vendor '{invoice.get('vendor_name') or '?'}' is not the PO vendor '{po['vendor_name']}'",
+            invoice_value=invoice.get("vendor_name"), po_value=po["vendor_name"])
 
-        if len(high_severity) > 0:
-            result["match_result"] = "NO_MATCH"
-            result["score"] = max(0, 1.0 - (len(high_severity) * 0.3 + len(medium_severity) * 0.1))
-        elif len(medium_severity) > 0:
-            result["match_result"] = "PARTIAL_MATCH"
-            result["score"] = max(0, 1.0 - len(medium_severity) * 0.1)
-        elif len(all_discs) == 0:
-            result["match_result"] = "FULL_MATCH"
-            result["score"] = 1.0
-        else:
-            result["match_result"] = "PARTIAL_MATCH"
-            result["score"] = 0.85
+    # ---------- Currency ----------
+    if not currency:
+        add("CURRENCY_MISSING", MEDIUM, f"No currency on the invoice; PO is in {po['currency']}")
+    elif currency != po.get("currency"):
+        add("CURRENCY_MISMATCH", HIGH, f"Invoice is in {currency} but the PO is in {po['currency']}",
+            invoice_value=currency, po_value=po["currency"])
+    else:
+        add("CURRENCY_MATCH", LOW, f"Currency {currency} matches the PO", passed=True)
 
-        result["summary"] = {
-            "total_discrepancies": len(all_discs),
-            "high_severity": len(high_severity),
-            "medium_severity": len(medium_severity),
-            "low_severity": len([d for d in all_discs if d.get("severity") == "LOW"]),
-        }
+    # ---------- Lines ----------
+    if not inv_lines:
+        add("NO_LINES", MEDIUM, "No line items were read from the invoice; only header totals can be checked")
 
-        return result
+    po_lines = po.get("lines") or []
+    pairs = pair_lines(inv_lines, po_lines)
+    is_credit = invoice.get("invoice_type") == "CREDIT_NOTE"
+    line_results = []
+    expected_net = 0.0
 
-    def _match_invoice_to_po(self, invoice: dict, po: dict) -> dict:
-        """Compare invoice line items against PO line items."""
-        result = {"match_type": "INVOICE_PO", "discrepancies": [], "matched_items": 0, "total_items": 0}
+    for i, il in enumerate(inv_lines):
+        n = i + 1
+        qty = il.get("quantity") or 0.0
+        price = il.get("unit_price") or 0.0
+        res = {"line": n, "description": il.get("description"), "item_code": il.get("item_code"),
+               "quantity": qty, "unit_price": price, "total_price": il.get("total_price"),
+               "po_line_id": None, "checks": []}
+        if i not in pairs:
+            add("UNMATCHED_LINE", HIGH, f"Line {n} '{il.get('description') or il.get('item_code') or '?'}' is not on the PO", line=n)
+            res["checks"].append("UNMATCHED_LINE")
+            line_results.append(res)
+            continue
 
-        inv_items = invoice.get("line_items", [])
-        po_items = po.get("items", [])
-        result["total_items"] = len(inv_items)
+        pl = po_lines[pairs[i]]
+        received = pl.get("received_qty") or 0.0
+        before = billed.get(pl["po_line_id"], 0.0)
+        available = received - before
+        res.update({"po_line_id": pl["po_line_id"], "po_line_num": pl["line_num"], "po_description": pl["description"],
+                    "po_item_number": pl.get("item_number"), "ordered_qty": pl["quantity"], "po_unit_price": pl["unit_price"],
+                    "received_qty": received, "billed_before": before, "available_qty": round(available, 3),
+                    "receipts": pl.get("receipts", [])})
+        expected_net += qty * pl["unit_price"]
 
-        # Total amount comparison (use subtotal if available, since PO total is pre-tax)
-        inv_total = invoice.get("subtotal") or invoice.get("total_amount", 0)
-        po_total = po.get("total_amount", 0)
-        if po_total > 0:
-            variance = abs(inv_total - po_total) / po_total
-            if variance > PRICE_TOLERANCE:
-                result["discrepancies"].append({
-                    "type": "TOTAL_MISMATCH",
-                    "severity": "HIGH",
-                    "message": f"Invoice total (${inv_total:,.2f}) differs from PO total (${po_total:,.2f}) by {variance*100:.1f}%",
-                    "invoice_value": inv_total,
-                    "po_value": po_total,
-                    "variance_pct": round(variance * 100, 1)
-                })
-
-        # Line item matching
-        for inv_item in inv_items:
-            best_match = self._find_best_item_match(inv_item, po_items)
-            if best_match:
-                result["matched_items"] += 1
-                # Check quantity
-                inv_qty = inv_item.get("quantity", 0)
-                po_qty = best_match.get("quantity", 0)
-                if po_qty > 0:
-                    qty_variance = abs(inv_qty - po_qty) / po_qty
-                    if qty_variance > QUANTITY_TOLERANCE:
-                        result["discrepancies"].append({
-                            "type": "QUANTITY_MISMATCH",
-                            "severity": "MEDIUM",
-                            "message": f"Item '{inv_item.get('description', '')}': Invoice qty ({inv_qty}) vs PO qty ({po_qty})",
-                            "invoice_value": inv_qty,
-                            "po_value": po_qty,
-                        })
-
-                # Check unit price
-                inv_price = inv_item.get("unit_price", 0)
-                po_price = best_match.get("unit_price", 0)
-                if po_price > 0:
-                    price_variance = abs(inv_price - po_price) / po_price
-                    if price_variance > PRICE_TOLERANCE:
-                        result["discrepancies"].append({
-                            "type": "PRICE_MISMATCH",
-                            "severity": "HIGH",
-                            "message": f"Item '{inv_item.get('description', '')}': Invoice price (${inv_price:,.2f}) vs PO price (${po_price:,.2f})",
-                            "invoice_value": inv_price,
-                            "po_value": po_price,
-                        })
+        # price
+        diff = price - pl["unit_price"]
+        if abs(diff) > tol.price_limit(pl["unit_price"]):
+            if diff > 0:
+                add("PRICE_OVER", HIGH,
+                    f"Line {n}: unit price {price:,.2f} is {_pct(diff, pl['unit_price'])}% above the PO price {pl['unit_price']:,.2f}",
+                    line=n, invoice_value=price, po_value=pl["unit_price"], variance_pct=_pct(diff, pl["unit_price"]))
+                res["checks"].append("PRICE_OVER")
             else:
-                result["discrepancies"].append({
-                    "type": "UNMATCHED_ITEM",
-                    "severity": "MEDIUM",
-                    "message": f"Invoice item '{inv_item.get('description', '')}' not found in PO"
-                })
+                add("PRICE_UNDER", LOW,
+                    f"Line {n}: unit price {price:,.2f} is below the PO price {pl['unit_price']:,.2f}",
+                    passed=True, line=n, invoice_value=price, po_value=pl["unit_price"], variance_pct=_pct(diff, pl["unit_price"]))
+        res["price_variance_pct"] = _pct(diff, pl["unit_price"])
 
-        return result
+        if not is_credit:
+            # receipt
+            if received <= 0:
+                add("NOT_RECEIVED", HIGH, f"Line {n}: nothing has been received against PO line {pl['line_num']} yet",
+                    line=n, invoice_value=qty, received=0)
+                res["checks"].append("NOT_RECEIVED")
+            elif qty - available > tol.qty_limit(max(available, 0)):
+                add("QTY_EXCEEDS_RECEIVED", HIGH,
+                    f"Line {n}: invoiced {qty:g} but only {max(available, 0):g} received and not yet billed"
+                    + (f" ({before:g} billed before)" if before else ""),
+                    line=n, invoice_value=qty, received=received, billed_before=before)
+                res["checks"].append("QTY_EXCEEDS_RECEIVED")
+            # order
+            if before + qty - pl["quantity"] > tol.qty_limit(pl["quantity"]):
+                add("QTY_EXCEEDS_PO", HIGH,
+                    f"Line {n}: billing would reach {before + qty:g} against {pl['quantity']:g} ordered",
+                    line=n, invoice_value=qty, po_value=pl["quantity"], billed_before=before)
+                res["checks"].append("QTY_EXCEEDS_PO")
+        # unit
+        if il.get("uom") and pl.get("uom") and _norm_code(il["uom"]) != _norm_code(pl["uom"]):
+            add("UOM_MISMATCH", MEDIUM, f"Line {n}: invoiced in {il['uom']} but ordered in {pl['uom']}",
+                line=n, invoice_value=il["uom"], po_value=pl["uom"])
+            res["checks"].append("UOM_MISMATCH")
+        line_results.append(res)
 
-    def _match_po_to_grn(self, po: dict, grn: dict) -> dict:
-        """Compare PO items against goods received."""
-        result = {"match_type": "PO_GRN", "discrepancies": []}
+    if is_credit:
+        add("CREDIT_NOTE", MEDIUM, "Credit note: quantities are not checked against receipts; confirm the return")
 
-        po_items = po.get("items", [])
-        grn_items = grn.get("items", [])
+    # ---------- Header net ----------
+    net = invoice.get("subtotal")
+    if net is None and invoice.get("total_amount") is not None:
+        net = invoice["total_amount"] - (invoice.get("tax_amount") or 0)
+    if net is not None and inv_lines:
+        # Each line was checked against the PO above; here we look for charges that are not itemised.
+        line_sum = sum((l.get("total_price") or 0) for l in inv_lines)
+        diff = net - line_sum
+        if abs(diff) > max(tol.total_abs, abs(line_sum) * 0.001):
+            add("TOTAL_MISMATCH", HIGH,
+                f"Invoice net {net:,.2f} is {diff:+,.2f} away from the sum of its lines ({line_sum:,.2f}); "
+                "look for fees or charges not itemised on the invoice",
+                invoice_value=round(net, 2), expected_value=round(line_sum, 2), variance_pct=_pct(diff, line_sum))
+        elif pairs:
+            po_value = round(expected_net, 2)
+            delta = round(line_sum - expected_net, 2)
+            add("TOTAL_MATCH", LOW,
+                f"Invoice net agrees with its lines; PO value of the billed quantities is {po_value:,.2f}"
+                + (f" ({delta:+,.2f})" if abs(delta) >= 0.01 else ""),
+                passed=True, invoice_value=round(net, 2), expected_value=po_value)
 
-        for po_item in po_items:
-            grn_match = self._find_best_item_match(po_item, grn_items)
-            if grn_match:
-                po_qty = po_item.get("quantity", 0)
-                grn_qty = grn_match.get("quantity", 0)
-                if po_qty > 0 and abs(po_qty - grn_qty) / po_qty > QUANTITY_TOLERANCE:
-                    result["discrepancies"].append({
-                        "type": "DELIVERY_SHORTAGE",
-                        "severity": "MEDIUM",
-                        "message": f"Item '{po_item.get('description', '')}': Ordered {po_qty}, received {grn_qty}",
-                        "ordered": po_qty,
-                        "received": grn_qty,
-                    })
-            else:
-                result["discrepancies"].append({
-                    "type": "NOT_RECEIVED",
-                    "severity": "HIGH",
-                    "message": f"PO item '{po_item.get('description', '')}' not found in goods receipt"
-                })
+    # ---------- PO fulfilment (informational) ----------
+    billed_idx = set(pairs.values())
+    open_lines = [pl for j, pl in enumerate(po_lines) if j not in billed_idx]
+    for pl in open_lines:
+        state = "received" if (pl.get("received_qty") or 0) > 0 else "not received"
+        add("PO_LINE_NOT_BILLED", LOW, f"PO line {pl['line_num']} ({pl['description']}) is {state} and not on this invoice",
+            passed=True, po_line=pl["line_num"])
 
-        return result
+    return _finish(checks, line_results, pairs, expected_net)
 
-    def _match_invoice_to_grn(self, invoice: dict, grn: dict) -> dict:
-        """Compare invoice items against goods received."""
-        result = {"match_type": "INVOICE_GRN", "discrepancies": []}
 
-        inv_items = invoice.get("line_items", [])
-        grn_items = grn.get("items", [])
+def _finish(checks: list[dict], lines: list[dict], pairs: Optional[dict], expected_net: float = 0.0) -> dict:
+    failed = [c for c in checks if not c["passed"]]
+    high = [c for c in failed if c["severity"] == HIGH]
+    medium = [c for c in failed if c["severity"] == MEDIUM]
+    low = [c for c in failed if c["severity"] == LOW]
+    if high:
+        result = "NO_MATCH"
+    elif medium:
+        result = "PARTIAL_MATCH"
+    else:
+        result = "FULL_MATCH"
+    score = round(max(0.0, 1.0 - 0.35 * len(high) - 0.12 * len(medium) - 0.03 * len(low)), 2)
+    hold_codes = {"NOT_RECEIVED"}
+    awaiting_receipt = bool(high) and all(c["code"] in hold_codes for c in high)
+    return {
+        "match_result": result,
+        "score": score,
+        "awaiting_receipt": awaiting_receipt,
+        "checks": checks,
+        "discrepancies": [{"type": c["code"], **{k: v for k, v in c.items() if k not in ("code", "passed")}} for c in failed],
+        "lines": lines,
+        "pairs": pairs or {},
+        "expected_net": round(expected_net, 2),
+        "summary": {"high": len(high), "medium": len(medium), "low": len(low), "passed": len(checks) - len(failed)},
+    }
 
-        for inv_item in inv_items:
-            grn_match = self._find_best_item_match(inv_item, grn_items)
-            if grn_match:
-                inv_qty = inv_item.get("quantity", 0)
-                grn_qty = grn_match.get("quantity", 0)
-                if grn_qty > 0 and abs(inv_qty - grn_qty) / grn_qty > QUANTITY_TOLERANCE:
-                    result["discrepancies"].append({
-                        "type": "INVOICE_RECEIPT_QTY",
-                        "severity": "MEDIUM",
-                        "message": f"Item '{inv_item.get('description', '')}': Invoiced {inv_qty}, received {grn_qty}",
-                    })
 
-        return result
-
-    def _find_best_item_match(self, target: dict, candidates: list[dict]) -> Optional[dict]:
-        """Find the best matching item using item_code or fuzzy description match."""
-        target_code = target.get("item_code", "")
-        target_desc = target.get("description", "")
-
-        # Try exact item code match first
-        if target_code:
-            for candidate in candidates:
-                if candidate.get("item_code") == target_code:
-                    return candidate
-
-        # Fuzzy description match
-        best_score = 0
-        best_match = None
-        for candidate in candidates:
-            cand_desc = candidate.get("description", "")
-            score = SequenceMatcher(None, target_desc.lower(), cand_desc.lower()).ratio()
-            if score > best_score and score >= DESCRIPTION_THRESHOLD:
-                best_score = score
-                best_match = candidate
-
-        return best_match
+def tolerance_dict(t: Tolerance) -> dict:
+    return asdict(t)
